@@ -128,11 +128,14 @@ We also provide few Jupyter notebooks demonstrating how to use the Cisco Time Se
 ## Citation
 If you find Cisco Time Series Model useful for your research, please consider citing the associated technical report:
 ```
-@inproceedings{Gou2025CiscoTS,
-  title={Cisco Time Series Model Technical Report},
-  author={Liang Gou and Archit Khare and Praneet Pabolu and Prachi Patel and Joseph Ross and Hercy Shen and Yuhan Song and Jingze Sun and Kristal Curtis and Vedant Dharnidharka and Abhinav Mathur and Hao Yang},
-  year={2025},
-  url={https://api.semanticscholar.org/CorpusID:283251030}
+@misc{gou2025ciscotimeseriesmodel,
+      title={Cisco Time Series Model Technical Report}, 
+      author={Liang Gou and Archit Khare and Praneet Pabolu and Prachi Patel and Joseph Ross and Hercy Shen and Yuhan and Song and Jingze Sun and Kristal Curtis and Vedant Dharnidharka and Abhinav Mathur and Hao Yang},
+      year={2025},
+      eprint={2511.19841},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2511.19841}, 
 }
 ```
 
