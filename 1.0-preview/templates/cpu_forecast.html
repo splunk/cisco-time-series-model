@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>CiscoTsmMR CPU Forecast Sandbox</title>
+    <style>
+      :root {
+        color: #0f172a;
+        background-color: #f8fafc;
+        font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 960px;
+        padding: 2.5rem 1.5rem 4rem;
+        line-height: 1.5;
+      }
+      h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+      p.lead { margin-top: 0; font-size: 1rem; color: #475569; }
+      form {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 20px 35px rgba(15, 23, 42, 0.12);
+        margin-bottom: 2rem;
+      }
+      fieldset {
+        border: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 1rem;
+      }
+      label {
+        font-weight: 600;
+        color: #0f172a;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      input[type="number"],
+      textarea {
+        border-radius: 0.6rem;
+        border: 1px solid #cbd5f5;
+        padding: 0.65rem 0.75rem;
+        font-size: 1rem;
+        font-family: inherit;
+        resize: vertical;
+      }
+      input[type="file"] {
+        font-size: 0.95rem;
+      }
+      button {
+        width: fit-content;
+        border: none;
+        border-radius: 999px;
+        padding: 0.85rem 1.6rem;
+        font-size: 1rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, #2563eb, #0ea5e9);
+        color: white;
+        cursor: pointer;
+      }
+      .error {
+        background: #fee2e2;
+        border-radius: 0.75rem;
+        padding: 0.9rem 1.1rem;
+        color: #991b1b;
+        margin-bottom: 1rem;
+      }
+      .result-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 15px 30px rgba(15, 23, 42, 0.1);
+      }
+      .plotly-card {
+        margin-top: 2rem;
+      }
+      .api-block {
+        border-radius: 0.75rem;
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 1rem 1.25rem;
+        font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+        font-size: 0.9rem;
+      }
+      img.preview {
+        width: 100%;
+        max-height: 480px;
+        object-fit: contain;
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+        margin-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CiscoTsmMR CPU Forecast Sandbox</h1>
+    <p class="lead">
+      Upload a CSV, paste time-series data, or rely on the bundled sample to reproduce
+      <code>run_plot_cpu_csv.py</code> directly from your browser.
+    </p>
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+      <fieldset>
+        <label>
+          Forecast horizon (minutes)
+          <input type="number" name="horizon" min="1" max="{{ max_horizon }}" value="{{ horizon }}" required>
+        </label>
+        <label>
+          CSV upload
+          <input type="file" name="csv_file" accept=".csv,text/csv">
+          <small>Provide columns named <code>_time</code> and <code>cpu_util</code>.</small>
+        </label>
+        <label>
+          Or paste CSV rows
+          <textarea name="csv_text" rows="6">{{ csv_text }}</textarea>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 500;">
+          <input type="checkbox" name="use_sample" value="1" {% if use_sample %}checked{% endif %}>
+          Use bundled sample when no CSV is supplied
+        </label>
+        <button type="submit">Generate forecast</button>
+      </fieldset>
+    </form>
+
+    <section class="result-card">
+      <h2>API usage</h2>
+      <p>Automate forecasts via <code>/api/forecast</code> (POST JSON, URL-encoded, or multipart):</p>
+      <pre class="api-block">curl -o forecast.png -X POST http://localhost:8000/api/forecast \
+  -H "Content-Type: application/json" \
+  -d '{"horizon": {{ horizon }}, "use_sample": true}'</pre>
+      <p>To POST your own CSV file (with <code>_time</code> and <code>cpu_util</code> columns) use multipart form data:</p>
+      <pre class="api-block">curl -o forecast.png -X POST http://localhost:8000/api/forecast \
+  -F "horizon={{ horizon }}" \
+  -F "csv_file=@/path/to/cpu_utilization.csv;type=text/csv"</pre>
+      {% if image_data %}
+        <h2>Preview</h2>
+        <img class="preview" src="data:image/png;base64,{{ image_data }}" alt="Forecast preview">
+      {% endif %}
+      {% if plot_payload %}
+        <div class="plotly-card">
+          <h2>Interactive view</h2>
+          <div id="interactive-forecast" style="height: 480px;"></div>
+        </div>
+      {% endif %}
+    </section>
+    <script id="plot-payload-data" type="application/json">{{ plot_payload|tojson|safe if plot_payload else "null" }}</script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script>
+      const payloadNode = document.getElementById('plot-payload-data');
+      const plotPayload = payloadNode ? JSON.parse(payloadNode.textContent) : null;
+      if (plotPayload) {
+        const historyTrace = {
+          x: plotPayload.history.timestamps,
+          y: plotPayload.history.values,
+          mode: 'lines',
+          name: 'CPU utilization history',
+          line: { color: '#1f77b4', width: 2 }
+        };
+
+        const forecastTrace = {
+          x: plotPayload.forecast.timestamps,
+          y: plotPayload.forecast.mean,
+          mode: 'lines',
+          name: 'Forecast mean',
+          line: { color: '#ff7f0e', width: 2.2 }
+        };
+
+        const traces = [historyTrace];
+
+        if (plotPayload.forecast.p10 && plotPayload.forecast.p90) {
+          const bandLower = {
+            x: plotPayload.forecast.timestamps,
+            y: plotPayload.forecast.p10,
+            mode: 'lines',
+            line: { width: 0 },
+            hoverinfo: 'skip',
+            showlegend: false
+          };
+          const bandUpper = {
+            x: plotPayload.forecast.timestamps,
+            y: plotPayload.forecast.p90,
+            mode: 'lines',
+            fill: 'tonexty',
+            fillcolor: 'rgba(255, 127, 14, 0.18)',
+            line: { width: 0 },
+            name: 'Forecast 10–90% band'
+          };
+          traces.push(bandLower, bandUpper);
+        }
+
+        traces.push(forecastTrace);
+
+        const boundaryShape = {
+          type: 'line',
+          x0: plotPayload.boundary_timestamp,
+          x1: plotPayload.boundary_timestamp,
+          yref: 'paper',
+          y0: 0,
+          y1: 1,
+          line: {
+            color: '#0f172a',
+            width: 1.2,
+            dash: 'dash'
+          }
+        };
+
+        const layout = {
+          template: 'plotly_white',
+          hovermode: 'x unified',
+          legend: { orientation: 'h', y: -0.2 },
+          margin: { t: 60, r: 20, b: 60, l: 60 },
+          xaxis: {
+            title: 'Timestamp (UTC)',
+            tickformat: '%Y-%m-%d<br>%H:%M',
+          },
+          yaxis: {
+            title: 'CPU Utilization [%]'
+          },
+          shapes: [boundaryShape],
+          title: {
+            text: 'CiscoTsmMR Forecast vs. CPU Utilization History',
+            x: 0.01
+          }
+        };
+
+        const config = {
+          responsive: true,
+          displaylogo: false,
+          scrollZoom: true,
+          modeBarButtonsToRemove: ['lasso2d', 'select2d']
+        };
+
+        Plotly.newPlot('interactive-forecast', traces, layout, config);
+      }
+    </script>
+  </body>
+</html>
