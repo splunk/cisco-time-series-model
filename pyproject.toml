@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cisco-tsm"
+version = "1.0.0"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+
+description = "Cisco Time Series Model is a pretrained Multi-resolution time series forecasting model."
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
+dynamic = ["dependencies"]
+authors = [
+  { name = "Cisco/Splunk Team", email = "Team-CTSM-AI@cisco.com" },
+]
+
+keywords = ["time series", "forecasting", "foundation model"]
+
+classifiers = [
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[project.urls]
+Homepage = "https://github.com/splunk/cisco-time-series-model"
+Repository = "https://github.com/splunk/cisco-time-series-model"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools]
+packages = ["cisco_tsm"]
+package-dir = { cisco_tsm = "1.0/modeling" }
