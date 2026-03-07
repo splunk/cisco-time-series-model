@@ -9,12 +9,17 @@ The Cisco Time Series Model is a foundation model trained to perform univariate 
 For convenience, we also provide utilities for preparing a multiresolution context from a single resolution context (with length up to 512 x 60 = 30,720) directly.
 
 ## Latest Release (250M) - [CTSM 1.0](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0)
-Compared to our November 2025 ([`cisco-time-series-model-1.0-preview`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview)) release, the 250M model:
-- Is trained **from scratch** (no continued pretraining (CPT) from TimesFM weights).
-- Uses **2× internal observability (O11y) data** in the training mixture.
-- Improves **GIFT-Eval (public) MASE by 8.6%**.
+**Results and Improvements:**
+- Achieves **state-of-the-art performance in the Observability (O11y) domain** compared to leading models.
+  - **1-minute resolution:** Outperforms the second-best benchmarked model by **16.12%** in MASE score.
+  - **5-minute resolution:** Outperforms the second-best benchmarked model by **12.42%** in MASE score.
+- Improves **GIFT-EVAL (public) Benchmark MASE score by 8.57%** compared to our [previous release](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview).<br>
+
+**Key improvements over our November 2025 release ([`cisco-time-series-model-1.0-preview`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview)):**
+- Trained **from scratch** (NO continued pretraining (CPT) from TimesFM weights).
+- Uses **2× more internal observability (O11y) data** in the training mixture.
 - Reduces size from **~500M → ~250M parameters**.
-- Adds **short-context training** and **bidirectional coarse attention** for better robustness on short histories.
+- Adds **Short-Context Training**, **Bidirectional Coarse Attention**, and **RoPE** for better robustness overall.
 
 
 ## Model Architecture and Training Details
@@ -38,7 +43,7 @@ Our latest [Cisco Time Series Model 1.0](https://huggingface.co/cisco-ai/cisco-t
 </figure>
 
 ### Training Datasets
-The distribution of training corpus is as follows:
+The distribution of the training corpus is as follows:
 - Internal Splunk Observability Cloud metric time series (upweighted ~2× vs the previous release) datasets:
   - (1-hour, 1-minute) resolution: **46.2%**
   - (5-hour, 5-minute) resolution: **21.8%**
@@ -48,25 +53,44 @@ The distribution of training corpus is as follows:
 - Synthetic dataset: **9.5%**
 
 ## Technical Report
-- A detailed technical report is available on [arXiv](https://arxiv.org/abs/2511.19841) (also available locally [here](https://github.com/splunk/cisco-time-series-model/blob/main/1.0-preview/technical_report/Cisco-Time-Series-Model-Technical-Report.pdf))<br>
+- A detailed technical report is available on [arXiv](https://arxiv.org/abs/2511.19841) (also available locally [here](https://github.com/splunk/cisco-time-series-model/blob/main/1.0-preview/technical_report/Cisco-Time-Series-Model-Technical-Report.pdf)).<br>
 
-**NOTE:** the report focuses on our November 2025 release (`1.0-preview`), so some training details differ from our latest release. An updated technical report with details on the latest release will be made available in the near future.
+**NOTE:** The report focuses on our November 2025 release ([`1.0-preview`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview)), so some training details differ from our latest release. An updated technical report with details on the latest release will be made available in the near future.
 
-## [GIFT-EVAL](https://github.com/SalesforceAIResearch/gift-eval) Benchmark
-All results below are computed on the entire [GIFT-Eval](https://github.com/SalesforceAIResearch/gift-eval) benchmark, with forecast horizon capped at ≤ 128. Models are sorted by MASE scores (lower is better).
+## Benchmark Results
+
+### > Observability Data
+With reference to the training and validation sets, these time series are both out-of-domain and in-the-future. We apply curation rules similar to those described in Section 3 (of the [technical report](https://arxiv.org/abs/2511.19841)) to ensure a diverse and high-quality benchmark. <br>
+We report metrics (models sorted by MASE scores, lower is better) on both 1-minute and 5-minute resolution data (with coarse contexts at 1-hour and 5-hour resolution, respectively). For observability data, error metrics are computed per horizon, then all horizons are aggregated via arithmetic mean. This quantity is normalized by a similar computation using a naive baseline which simply forecasts the final value in the context for all time steps in the horizon (as no natural seasonality is available). <br>
+
+An input context of 1024 length is used with a forecast horizon of 128 length for all models. Metrics of MSIS and CRPS are both computed using 9 quantiles (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9) to keep them consistent with the [GIFT-EVAL](https://github.com/SalesforceAIResearch/gift-eval) Benchmark.
+
+#### 1. `1-minute` Resolution data
+| MODEL | MSE | MAE | MASE | sMAPE | MSIS | CRPS |
+|:---|:---|:---|:---|:---|:---|:---|
+| [`CTSM-1.0 (Ours)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0) | `0.196` | `0.366` | `0.562` | `0.923` | `0.164` | `0.295` |
+| [`Toto_Open_Base_1.0`](https://huggingface.co/Datadog/Toto-Open-Base-1.0) | `0.270` | `0.436` | `0.670` | `0.967` | `0.303` | `0.357` |
+| [`TimesFM-2.5`](https://huggingface.co/google/timesfm-2.5-200m-pytorch) | `0.250` | `0.441` | `0.671` | `0.980` | `0.186` | `0.361` |
+| [`Chronos-2`](https://huggingface.co/amazon/chronos-2) | `0.242` | `0.421` | `0.674` | `0.955` | `0.192` | `0.341` |
+| [`TimesFM-2.0`](https://huggingface.co/google/timesfm-2.0-500m-pytorch) | `0.338` | `0.547` | `0.762` | `1.030` | `0.214` | `0.443` |
+| [`Chronos-bolt-base`](https://huggingface.co/amazon/chronos-bolt-base) | `0.439` | `0.617` | `0.810` | `1.137` | `0.321` | `0.524` |
+
+
+#### 2. `5-minute` Resolution data
+| MODEL | MSE | MAE | MASE | sMAPE | MSIS | CRPS |
+|:---|:---|:---|:---|:---|:---|:---|
+| [`CTSM-1.0 (Ours)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0) | `0.232` | `0.425` | `0.543` | `1.005` | `0.195` | `0.340` |
+| [`Chronos-2`](https://huggingface.co/amazon/chronos-2) | `0.282` | `0.475` | `0.620` | `1.040` | `0.176` | `0.383` |
+| [`TimesFM-2.5`](https://huggingface.co/google/timesfm-2.5-200m-pytorch) | `0.293` | `0.490` | `0.621` | `1.047` | `0.171` | `0.395` |
+| [`Toto_Open_Base_1.0`](https://huggingface.co/Datadog/Toto-Open-Base-1.0) | `0.309` | `0.491` | `0.647` | `1.045` | `0.267` | `0.395` |
+| [`TimesFM-2.0`](https://huggingface.co/google/timesfm-2.0-500m-pytorch) | `0.322` | `0.527` | `0.723` | `1.065` | `0.202` | `0.424` |
+| [`Chronos-bolt-base`](https://huggingface.co/amazon/chronos-bolt-base) | `0.386` | `0.567` | `0.737` | `1.114` | `0.290` | `0.481` |
+
+
+### > [GIFT-EVAL](https://github.com/SalesforceAIResearch/gift-eval) Benchmark
+All results below are computed on the entire [GIFT-EVAL](https://github.com/SalesforceAIResearch/gift-eval) benchmark, with forecast horizon capped at ≤ 128. Models are sorted by MASE scores (lower is better). We adopt the standard approach of normalizing errors per dataset before applying a geometric mean.
 
 #### 1. Using the entire time series context
-| MODEL | MSE | MAE | MASE | sMAPE | MSIS | CRPS | Test Leak. |
-|:---|:---|:---|:---|:---|:---|:---|:---|
-| [`Chronos-2`](https://huggingface.co/amazon/chronos-2) | `0.471` | `0.659` | `0.678` | `0.887` | `0.464` | `0.531` | `NO` |
-| [`TimesFM-2.5`](https://huggingface.co/google/timesfm-2.5-200m-pytorch) | `0.464` | `0.667` | `0.684` | `0.851` | `0.494` | `0.540` | `NO` |
-| [`TimesFM-2.0`](https://huggingface.co/google/timesfm-2.0-500m-pytorch) | `0.521` | `0.697` | `0.707` | `0.933` | `0.529` | `0.566` | `YES` |
-| [`Toto_Open_Base_1.0`](https://huggingface.co/Datadog/Toto-Open-Base-1.0) | `0.528` | `0.691` | `0.715` | `0.932` | `0.526` | `0.559` | `NO` |
-| [`CTSM-1.0 (Ours)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0) | `0.510` | `0.692` | `0.715` | `0.936` | `0.538` | `0.564` | `NO` |
-| [`Chronos-bolt-base`](https://huggingface.co/amazon/chronos-bolt-base) | `0.562` | `0.722` | `0.747` | `0.967` | `0.597` | `0.592` | `YES` |
-| [`CTSM-1.0-preview (Ours, prev.)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview) | `0.585` | `0.757` | `0.782` | `0.999` | `0.584` | `0.615` | `YES` |
-
-#### 2. Using the time series context truncated to 1024 points
 | MODEL | MSE | MAE | MASE | sMAPE | MSIS | CRPS | Test Leak. |
 |:---|:---|:---|:---|:---|:---|:---|:---|
 | [`Chronos-2`](https://huggingface.co/amazon/chronos-2) | `0.493` | `0.674` | `0.692` | `0.904` | `0.485` | `0.542` | `NO` |
@@ -77,11 +101,23 @@ All results below are computed on the entire [GIFT-Eval](https://github.com/Sale
 | [`Chronos-bolt-base`](https://huggingface.co/amazon/chronos-bolt-base) | `0.552` | `0.721` | `0.749` | `0.967` | `0.591` | `0.589` | `YES` |
 | [`CTSM-1.0-preview (Ours, prev.)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview) | `0.585` | `0.757` | `0.782` | `0.999` | `0.584` | `0.615` | `YES` |
 
-> ***Test Leak.:** `YES` indicates that the model's training data inadvertently includes portions of the [GIFT-Eval](https://github.com/SalesforceAIResearch/gift-eval) test set.*
+
+#### 2. Using the time series context truncated to 1024 points
+| MODEL | MSE | MAE | MASE | sMAPE | MSIS | CRPS | Test Leak. |
+|:---|:---|:---|:---|:---|:---|:---|:---|
+| [`Chronos-2`](https://huggingface.co/amazon/chronos-2) | `0.471` | `0.659` | `0.678` | `0.887` | `0.464` | `0.531` | `NO` |
+| [`TimesFM-2.5`](https://huggingface.co/google/timesfm-2.5-200m-pytorch) | `0.464` | `0.667` | `0.684` | `0.851` | `0.494` | `0.540` | `NO` |
+| [`TimesFM-2.0`](https://huggingface.co/google/timesfm-2.0-500m-pytorch) | `0.521` | `0.697` | `0.707` | `0.933` | `0.529` | `0.566` | `YES` |
+| [`Toto_Open_Base_1.0`](https://huggingface.co/Datadog/Toto-Open-Base-1.0) | `0.528` | `0.691` | `0.715` | `0.932` | `0.526` | `0.559` | `NO` |
+| [`CTSM-1.0 (Ours)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0) | `0.510` | `0.692` | `0.715` | `0.936` | `0.538` | `0.564` | `NO` |
+| [`Chronos-bolt-base`](https://huggingface.co/amazon/chronos-bolt-base) | `0.562` | `0.722` | `0.747` | `0.967` | `0.597` | `0.592` | `YES` |
+| [`CTSM-1.0-preview (Ours, prev.)`](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0-preview) | `0.585` | `0.757` | `0.782` | `0.999` | `0.584` | `0.615` | `YES` |
+
+> ***Test Leak.:** `YES` indicates that the model's training data inadvertently includes portions of the [GIFT-EVAL](https://github.com/SalesforceAIResearch/gift-eval) test set.*
 
 ## Usage notes
-- If the input time series is missing some values, imputation via last value is recommended; if the time series is naturally sparse and this leads to excessive imputation (e.g., more than 30% of values are imputed), the model forecasts will deteriorate.
-- This release includes short-context training with 1/3rd of training data sampled uniformly in the range of `[10, 511]` in the fine context. However, the model generally works better when more coarse resolution history is provided.
+- If the input time series is missing some values, imputation via last value is recommended; if the time series is naturally sparse and this leads to excessive imputation (e.g., more than 30% of values are imputed), the model's forecasts will deteriorate.
+- This release includes short-context training with 1/3rd of the training data sampled uniformly in the range of `[10, 511]` in the fine context. However, the model generally works better when more coarse resolution history is provided.
 - The quantiles have not been calibrated or rigorously evaluated, e.g., we currently do not have evidence to support a claim along the lines of “the range from q=0.01 to q=0.99 contains the true value 98% of the time (under some mild conditions).”
 
 ## Dependencies and Installation
