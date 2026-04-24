@@ -135,7 +135,7 @@ source .venv/bin/activate
 ```
 
 ### PyPI Package
-The Cisco Time Series Model is available as a PyPI package named `cisco-tsm`. You can install it using pip:
+The Cisco Time Series Model is available as a [PyPI package](https://pypi.org/project/cisco-tsm/) named `cisco-tsm`. You can install it using pip:
 ```shell
 uv pip install cisco-tsm
 ```
