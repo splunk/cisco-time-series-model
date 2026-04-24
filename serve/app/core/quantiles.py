@@ -22,9 +22,12 @@ def normalize_quantile_name(name: str) -> str:
 
 
 def resolve_requested_quantiles(requested: Iterable[str]) -> list[str]:
+    items = list(requested)
+    if not items:
+        return list(QUANTILE_MAPPING.keys())
     out: list[str] = []
     seen: set[str] = set()
-    for raw in requested:
+    for raw in items:
         q = normalize_quantile_name(raw)
         if q not in QUANTILE_MAPPING:
             supported = ", ".join(sorted(QUANTILE_MAPPING))
@@ -45,12 +48,12 @@ def model_key_for_api_name(api_name: str) -> str:
 def extract_from_forecast_dict(
     forecast: dict,
     requested_api_names: list[str],
-) -> tuple[list[float], dict[str, list[float]]]:
+) -> tuple[list[float | None], dict[str, list[float | None]]]:
     """Build mean + quantiles dict for HTTP response from one model output dict."""
     mean_arr = forecast.get("mean")
     if mean_arr is None:
         raise BadInputError("Model output missing 'mean'")
-    mean_list = [float(x) for x in mean_arr.tolist()]
+    mean_list = [None if x is None else float(x) for x in mean_arr.tolist()]
 
     raw_q: dict = forecast.get("quantiles") or {}
     normalized_model_q: dict[str, object] = {}
@@ -68,7 +71,7 @@ def extract_from_forecast_dict(
                 f"Model output missing quantile key {mk!r} (for {api_name!r})",
                 details={"model_key": mk, "api_name": api_name, "available": sorted(normalized_model_q)},
             )
-        quantiles_out[api_name] = [float(x) for x in arr.tolist()]
+        quantiles_out[api_name] = [None if x is None else float(x) for x in arr.tolist()]
 
     return mean_list, quantiles_out
 

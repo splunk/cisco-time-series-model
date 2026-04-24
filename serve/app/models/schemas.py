@@ -52,8 +52,8 @@ class InferRequestBody(BaseModel):
 
 
 class PredictionItem(BaseModel):
-    mean: list[float]
-    quantiles: dict[str, list[float]]
+    mean: list[float | None]
+    quantiles: dict[str, list[float | None]]
 
 
 class InferSuccessResponse(BaseModel):
