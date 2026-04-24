@@ -118,7 +118,6 @@ All results below are computed on the entire [GIFT-EVAL](https://github.com/Sale
 ## Usage notes
 - If the input time series is missing some values, imputation via last value is recommended; if the time series is naturally sparse and this leads to excessive imputation (e.g., more than 30% of values are imputed), the model's forecasts will deteriorate.
 - This release includes short-context training with 1/3rd of the training data sampled uniformly in the range of `[10, 511]` in the fine context. However, the model generally works better when more coarse resolution history is provided.
-- The quantiles have not been calibrated or rigorously evaluated, e.g., we currently do not have evidence to support a claim along the lines of “the range from q=0.01 to q=0.99 contains the true value 98% of the time (under some mild conditions).”
 
 ## Dependencies and Installation
 
@@ -220,6 +219,44 @@ We also provide a few Jupyter notebooks demonstrating how to use the Cisco Time 
 - [Internet Traffic Forecasting](https://github.com/splunk/cisco-time-series-model/blob/main/1.0/notebooks/internet_traffic_forecast.ipynb)
 
 <b>Notebooks contributed by:</b> Huaibo Zhao
+
+## Self-Hosting
+
+The Cisco Deep Time Series Model (CDTSM) can be self-hosted as a FastAPI inference server,
+enabling on-premise or private-cloud deployments with full control over the runtime environment.
+
+<b>Quick start (Docker):</b>
+
+```shell
+cd serve/
+cp .env-example .env   # set CDTSM_AUTH_TOKEN (user-defined token for authentication)
+docker compose up --build
+```
+
+<b>Quick start (process-based):</b>
+
+```shell
+cd serve/
+cp .env-example .env   # set CDTSM_AUTH_TOKEN (user-defined token for authentication)
+export CDTSM_AUTH_TOKEN=<your-token>
+
+# CPU-Only
+make install-dev && make model-up
+
+# GPU-Accelerated
+make install-dev-gpu && make model-up
+```
+
+The [`serve/`](https://github.com/splunk/cisco-time-series-model/tree/main/serve/) directory provides:
+- <b>Process-based hosting</b> via a Makefile with CPU and GPU targets
+- <b>Docker-based hosting</b> with CPU and GPU images, persistent model cache, and non-root container execution
+- Bearer token authentication
+- Health (`/health`) and readiness (`/ready`) probes
+- An AITK-compatible JSON API at `POST /cdtsm/v1/ai/infer`
+
+Both CPU and GPU (NVIDIA CUDA) backends are supported. See the [serve/README.md](https://github.com/splunk/cisco-time-series-model/blob/main/serve/README.md) for full setup instructions, environment variables, API reference, and example requests.<br>
+
+<b>Self-Hosting contributed by:</b> Udaya Prasad Vakalapudi<br>
 
 ## Citation
 If you find Cisco Time Series Model useful for your research, please consider citing the associated technical report:

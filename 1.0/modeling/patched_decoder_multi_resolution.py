@@ -397,6 +397,8 @@ class PatchedTSMultiResolutionDecoder(ppd.PatchedTimeSeriesDecoder):
       offsets_fine: Optional[Union[List[float], torch.Tensor]] = None,
       scales_fine: Optional[Union[List[float], torch.Tensor]] = None,
       output_patch_len: int = 128,
+      restrict_quantiles: bool = False,
+      quantile_forecast_len: int = 128,
       offsets_coarse: Optional[Union[List[float], torch.Tensor]] = None,
       scales_coarse: Optional[Union[List[float], torch.Tensor]] = None,
   ) -> List[Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]]:
@@ -410,16 +412,21 @@ class PatchedTSMultiResolutionDecoder(ppd.PatchedTimeSeriesDecoder):
       offsets_fine: list of length B of denormalization offsets for fine-res stream.
       scales_fine: list of length B of denormalization scales for fine-res stream.
       output_patch_len: number of fine-res steps to decode per iteration.
+      restrict_quantiles: if True, returns `None` for quantile forecasts beyond `quantile_forecast_len`.
+      quantile_forecast_len: number of fine-resolution steps for which quantiles are returned when `restrict_quantiles` is True and steps beyond this are returned as `None`.
       offsets_coarse: list of length B of denormalization offsets for coarse-res stream.
       scales_coarse: list of length B of denormalization scales for coarse-res stream.
 
     Returns:
       A list of length B of dictionaries:
         - "mean": mean forecast array of length `horizon_len`,
-        - "quantiles": dict of quantile forecasts, each an array of length `horizon_len`.
+        - "quantiles": dict of quantile forecasts, each an array of length `horizon_len`. If `restrict_quantiles` is True, steps beyond `quantile_forecast_len` are returned as `None`.
     """
     if self.config.agg_factor <= 0:
       raise ValueError("agg_factor must be positive for autoregressive decoding.")
+
+    if restrict_quantiles and quantile_forecast_len <= 0:
+      raise ValueError("quantile_forecast_len must be positive when restrict_quantiles is True.")
 
     q_levels = self.config.quantiles
     expected_q_plus_mean = len(q_levels) + 1
@@ -478,6 +485,8 @@ class PatchedTSMultiResolutionDecoder(ppd.PatchedTimeSeriesDecoder):
       coarse_raw = coarse_ts.to(torch.float32)
 
     remaining = horizon_len
+    quantile_horizon = min(horizon_len, quantile_forecast_len) if restrict_quantiles else horizon_len
+    quant_remaining = quantile_horizon
     mean_chunks = []
     quant_chunks = []
     coarse_source_buffer = torch.empty((B, 0), device=device, dtype=torch.float32)
@@ -528,7 +537,10 @@ class PatchedTSMultiResolutionDecoder(ppd.PatchedTimeSeriesDecoder):
       quant_denorm = torch.nan_to_num(quant_denorm, nan=0.0, posinf=0.0, neginf=-0.0)
 
       mean_chunks.append(mean_denorm[:, :step_taken])
-      quant_chunks.append(quant_denorm[:, :step_taken, :])
+      if quant_remaining > 0:
+        quant_step_taken = min(step_taken, quant_remaining)
+        quant_chunks.append(quant_denorm[:, :quant_step_taken, :])
+        quant_remaining -= quant_step_taken
       remaining -= step_taken
 
       # Append raw/original-scale minute predictions for the next step.
@@ -565,19 +577,24 @@ class PatchedTSMultiResolutionDecoder(ppd.PatchedTimeSeriesDecoder):
         break
 
     mean_full = torch.cat(mean_chunks, dim=1)[:, :horizon_len]
-    quant_full = torch.cat(quant_chunks, dim=1)[:, :horizon_len, :]
+    quant_full = torch.cat(quant_chunks, dim=1)[:, :quantile_horizon, :]
 
     mean_np = mean_full.cpu().numpy()
     quant_np = quant_full.cpu().numpy()
 
     final_predictions = []
     for i in range(B):
-      q_arr = np.transpose(quant_np[i], (1, 0))  # [Q, H]
-      final_predictions.append(
-          {
-            "mean": mean_np[i],
-            "quantiles": {str(q_levels[q_i]): q_arr[q_i] for q_i in range(q_arr.shape[0])}
-          }
-      )
+      q_arr = np.transpose(quant_np[i], (1, 0))  # [Q, Hq]
+      if restrict_quantiles and quantile_horizon < horizon_len:
+        quantiles = {}
+        for q_i in range(q_arr.shape[0]):
+          q_obj = np.empty((horizon_len,), dtype=object)
+          q_obj[:quantile_horizon] = q_arr[q_i]
+          q_obj[quantile_horizon:] = None
+          quantiles[str(q_levels[q_i])] = q_obj
+      else:
+        quantiles = {str(q_levels[q_i]): q_arr[q_i] for q_i in range(q_arr.shape[0])}
+
+      final_predictions.append({"mean": mean_np[i], "quantiles": quantiles})
     
     return final_predictions

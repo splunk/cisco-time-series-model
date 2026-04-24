@@ -282,7 +282,10 @@ class CiscoTsmMR(TimesFmTorch):
   def forecast(self, 
                inputs: Sequence[Any],
                horizon_len: Optional[int] = None, 
-               batch_size: int = 8) -> List[Dict[str, Any]]:
+               batch_size: int = 8,
+               *,
+               restrict_quantiles: bool = False,
+               quantile_forecast_len: int = 128) -> List[Dict[str, Any]]:
     """Forecasts from a single fine-resolution stream.
 
     Derives the coarse-resolution stream by aggregating the fine-resolution
@@ -301,6 +304,8 @@ class CiscoTsmMR(TimesFmTorch):
         - if None, uses the model's configured horizon length (output_patch_len).
         - if > output_patch_len, the model will predict autoregressively until horizon_len is reached.
       batch_size: batch size for forecasting.
+      restrict_quantiles: if True, returns `None` for quantile forecasts beyond `quantile_forecast_len`.
+      quantile_forecast_len: number of fine-resolution steps for which quantiles are returned when `restrict_quantiles` is True and steps beyond this are returned as `None`.
 
     Returns:
       List of dicts, each with:
@@ -318,6 +323,9 @@ class CiscoTsmMR(TimesFmTorch):
 
     if batch_size <= 0:
       raise ValueError("batch_size must be positive")
+
+    if restrict_quantiles and quantile_forecast_len <= 0:
+      raise ValueError("quantile_forecast_len must be positive when restrict_quantiles is True")
 
     inputs = self._normalize_inputs(inputs)
 
@@ -409,7 +417,9 @@ class CiscoTsmMR(TimesFmTorch):
                                    scales_fine=scales_fine[start:end],
                                    offsets_coarse=offsets_coarse[start:end],
                                    scales_coarse=scales_coarse[start:end],
-                                   output_patch_len=self.output_patch_len)
+                                   output_patch_len=self.output_patch_len,
+                                   restrict_quantiles=restrict_quantiles,
+                                   quantile_forecast_len=quantile_forecast_len)
 
       final_predictions.extend(preds)
 
