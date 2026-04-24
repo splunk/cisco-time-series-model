@@ -1,0 +1,16 @@
+# Merge with base compose: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+services:
+  cdtsm:
+    image: cisco-tsm-serve:gpu-local
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    environment:
+      CDTSM_TORCH_BACKEND: ${CDTSM_TORCH_BACKEND:-auto}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

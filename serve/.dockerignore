@@ -1,0 +1,16 @@
+.venv/
+.env
+.env-example
+.git/
+.gitignore
+.idea/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+tests/
+scripts/
+Makefile
+Dockerfile*
+docker-compose*.yml

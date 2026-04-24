@@ -1,0 +1,19 @@
+services:
+  cdtsm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cisco-tsm-serve:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      CDTSM_HF_REPO_ID: ${CDTSM_HF_REPO_ID:-cisco-ai/cisco-time-series-model-1.0}
+      CDTSM_TORCH_BACKEND: ${CDTSM_TORCH_BACKEND:-cpu}
+      CDTSM_LOG_LEVEL: ${CDTSM_LOG_LEVEL:-INFO}
+    volumes:
+      - hf_cache:/home/appuser/.cache/huggingface
+
+volumes:
+  hf_cache:

@@ -1,0 +1,47 @@
+# NVIDIA GPU image: CUDA-enabled PyTorch + same app layers as Dockerfile.
+# Run with: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+# Requires: NVIDIA driver + nvidia-container-toolkit on the host.
+FROM python:3.11-slim-bookworm AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    CDTSM_TORCH_BACKEND=auto \
+    HF_HUB_DISABLE_XET=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ARG TORCH_CUDA_INDEX=https://download.pytorch.org/whl/cu124
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir torch --index-url ${TORCH_CUDA_INDEX}
+
+COPY requirements.txt README.md ./
+COPY app ./app
+
+# The FastAPI app is imported as ``app.main:app`` directly from WORKDIR, so no
+# editable install is needed; dependencies come from requirements.txt only.
+# The final torch reinstall re-pins the CUDA wheel in case requirements.txt
+# pulled in a CPU-only torch transitively.
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir --force-reinstall torch --index-url ${TORCH_CUDA_INDEX}
+
+RUN useradd --create-home --uid 10001 appuser && \
+    mkdir -p /home/appuser/.cache/huggingface && \
+    chown -R appuser:appuser /home/appuser/.cache
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
