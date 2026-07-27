@@ -6,4 +6,4 @@ cisco-tsm>=1.0.2
 httpx>=0.27.0
 certifi>=2024.0.0
 truststore>=0.10.0
-tqdm>=4.66.0
+tqdm>=4.66.3
