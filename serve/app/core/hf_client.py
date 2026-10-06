@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-import httpx
+from huggingface_hub.utils import httpx
 import huggingface_hub.constants as hf_constants
 from huggingface_hub.utils._http import (
     hf_request_event_hook,
