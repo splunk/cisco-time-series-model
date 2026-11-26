@@ -14,8 +14,10 @@ except ImportError:
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
+from math import isfinite
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -25,7 +27,7 @@ from app.core.hf_client import configure_huggingface_http
 from app.core.exceptions import CDTSMServiceError
 from app.core.logging import get_logger, setup_logging
 from app.models.schemas import ErrorDetail, InferErrorResponse
-from app.services.model_service import get_model_service
+from app.services.model_service import get_model_service, get_v15_model_service
 
 logger = get_logger(__name__)
 
@@ -40,7 +42,10 @@ async def lifespan(app: FastAPI):
     )
     configure_huggingface_http(settings)
     svc = get_model_service()
-    load_task = asyncio.create_task(asyncio.to_thread(svc.load))
+    load_tasks = [asyncio.create_task(asyncio.to_thread(svc.load))]
+    if settings.v15_checkpoint_path is not None:
+        v15 = get_v15_model_service()
+        load_tasks.append(asyncio.create_task(asyncio.to_thread(v15.load)))
     logger.info(
         "Background model load started (/health up; /ready until load completes)",
         extra={"structured": {"service": settings.service_name}},
@@ -48,12 +53,10 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        if not load_task.done():
-            load_task.cancel()
-            try:
-                await load_task
-            except asyncio.CancelledError:
-                pass
+        for task in load_tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*load_tasks, return_exceptions=True)
         logger.info("Shutdown complete")
 
 
@@ -93,4 +96,10 @@ async def validation_handler(request: Request, exc: RequestValidationError) -> J
             details={"errors": errs},
         ),
     )
-    return JSONResponse(status_code=422, content=body.model_dump())
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder(
+            body.model_dump(),
+            custom_encoder={ValueError: str, float: lambda value: value if isfinite(value) else None},
+        ),
+    )

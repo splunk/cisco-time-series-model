@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
@@ -63,6 +64,10 @@ class Settings(BaseSettings):
         default="auto",
         description="cpu: force CPU | gpu: require CUDA | auto: GPU if available else CPU",
     )
+    v15_checkpoint_path: Path | None = Field(
+        default=None,
+        description="Local released CTSM 1.5 weights for the optional endpoints",
+    )
     serving_backend: str = Field(
         default="native",
         description=(
@@ -96,6 +101,11 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Validators                                                         #
     # ------------------------------------------------------------------ #
+    @field_validator("v15_checkpoint_path", mode="before")
+    @classmethod
+    def normalize_v15_checkpoint_path(cls, v: object) -> object:
+        return None if isinstance(v, str) and not v.strip() else v
+
     @field_validator("hf_insecure_ssl", mode="before")
     @classmethod
     def coerce_hf_insecure_ssl(cls, v: object) -> bool:

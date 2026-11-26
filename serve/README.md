@@ -1,8 +1,7 @@
 # Self-Hosting the Cisco Deep Time Series Model (CDTSM)
 
-A self-hosted [FastAPI](https://fastapi.tiangolo.com/) inference server that loads the
-[Cisco Deep Time Series Model](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0)
-from Hugging Face and exposes an **AITK-compatible** JSON API for multiresolution forecasting.
+A self-hosted FastAPI inference server for CTSM 1.0 and CTSM 1.5. It exposes the
+existing **AITK-compatible** API for CTSM 1.0 and an opt-in endpoint for CTSM 1.5.
 
 This directory is part of the
 [Cisco Deep Time Series Model](https://github.com/splunk/cisco-time-series-model) repository.
@@ -10,9 +9,14 @@ See the [root README](https://github.com/splunk/cisco-time-series-model/blob/mai
 
 ## Model version note
 
-The PyPI package [`cisco-tsm`](https://pypi.org/project/cisco-tsm/) ships the **CDTSM 1.0**
-modeling code and matches the **`cisco-ai/cisco-time-series-model-1.0`** weights
-(`num_layers=25`, extended quantile head).
+The default server loads [CTSM 1.0](https://huggingface.co/cisco-ai/cisco-time-series-model-1.0)
+from Hugging Face. Existing clients send coarse and fine contexts to
+`POST /cdtsm/v1/ai/infer`. The `cisco-tsm` 1.0.3 release includes the `cisco_tsm`
+imports used by that endpoint and the new `ctsm_1p5.modeling` API.
+
+Set `CDTSM_V15_CHECKPOINT_PATH` to enable CTSM 1.5 alongside 1.0.
+The 1.5 endpoint accepts raw history and optional timestamps. It constructs
+coarse and fine contexts internally.
 
 ## Prerequisites
 
@@ -93,6 +97,30 @@ curl http://localhost:8080/health
 curl http://localhost:8080/ready
 ```
 
+### Enable CTSM 1.5
+
+Download the released CTSM 1.5 weights from Hugging Face after running
+`make install-dev` or `make install-dev-gpu` from `serve/`.
+
+```bash
+.venv/bin/hf download cisco-ai/cisco-time-series-model-1.5 model.safetensors --local-dir ../checkpoints
+export CDTSM_V15_CHECKPOINT_PATH="$PWD/../checkpoints/model.safetensors"
+make model-up
+```
+
+For Docker, build the server image and mount the checkpoint
+read-only, and set `CDTSM_V15_CHECKPOINT_PATH` to its **container** path. The file
+must be readable by the container's `appuser`.
+
+```bash
+docker compose run --service-ports \
+  -v /absolute/path/to/model.safetensors:/models/model.safetensors:ro \
+  -e CDTSM_V15_CHECKPOINT_PATH=/models/model.safetensors cdtsm
+```
+
+Check CTSM 1.5 load status at `GET /cdtsm/v1.5/ready`. The existing `GET /ready`
+tracks CTSM 1.0 readiness independently.
+
 ### Environment Variables
 
 All variables are prefixed with `CDTSM_`. Set them in `.env` or export before running.
@@ -102,7 +130,8 @@ All variables are prefixed with `CDTSM_`. Set them in `.env` or export before ru
 | `CDTSM_AUTH_TOKEN` | *(required)* | Bearer token for API authentication |
 | `CDTSM_HOST` | `0.0.0.0` | Server bind address |
 | `CDTSM_PORT` | `8080` | Server port |
-| `CDTSM_HF_REPO_ID` | `cisco-ai/cisco-time-series-model-1.0` | Hugging Face model repository |
+| `CDTSM_HF_REPO_ID` | `cisco-ai/cisco-time-series-model-1.0` | CTSM 1.0 Hugging Face model repository |
+| `CDTSM_V15_CHECKPOINT_PATH` | *(unset)* | Local path to released CTSM 1.5 weights. Setting it enables CTSM 1.5. |
 | `CDTSM_TORCH_BACKEND` | `cpu` (CPU image) / `auto` (GPU image) | PyTorch backend: `cpu`, `gpu`, or `auto` |
 | `CDTSM_LOG_LEVEL` | `INFO` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `CDTSM_HF_INSECURE_SSL` | `false` | Disable TLS verification for Hub downloads (corporate proxy workaround) |
@@ -117,8 +146,13 @@ Liveness probe — returns **200** if the process is running.
 
 ### `GET /ready`
 
-Readiness probe — returns **200** once the model is loaded and ready for inference.
-Returns **503** with `model_load` status while the model is downloading or initializing.
+CTSM 1.0 readiness probe. Returns **200** once the model is loaded and ready for
+inference. Returns **503** with `model_load` status while it is downloading or initializing.
+
+### `GET /cdtsm/v1.5/ready`
+
+CTSM 1.5 readiness probe. Returns **200** when the model is ready, **503** while it
+loads or if loading fails, and **404** when CTSM 1.5 is disabled.
 
 ### `POST /cdtsm/v1/ai/infer?horizon=128`
 
@@ -175,6 +209,32 @@ under `predictions[i].mean`.
       }
     }
   ]
+}
+```
+
+### `POST /cdtsm/v1.5/ai/infer?horizon=24`
+
+Use the same bearer token, response envelope, and quantile labels as the 1.0
+endpoint. For 1.5, the `mean` response field contains P50 of the sorted quantile
+forecast. Requests beyond 128 steps use three independent feedback paths.
+Pass a non-empty `history` with `null` for missing observations. If you supply
+`timestamps`, provide at least two timezone-naive ISO timestamps in ascending
+order, with one per history position. A series without timestamps uses
+value-only inference. A batch can include both types of series.
+
+```json
+{
+  "payload": [
+    {
+      "history": [10.0, 12.0, null, 11.5],
+      "timestamps": [
+        "2025-01-06T00:00:00", "2025-01-06T01:00:00",
+        "2025-01-06T02:00:00", "2025-01-06T03:00:00"
+      ]
+    }
+  ],
+  "model": "CTSM-1.5",
+  "metadata": { "quantiles": ["p10", "p50", "p90"] }
 }
 ```
 

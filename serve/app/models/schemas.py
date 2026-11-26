@@ -51,6 +51,20 @@ class InferRequestBody(BaseModel):
         return v
 
 
+class SeriesPayloadV15(BaseModel):
+    history: list[float | None] = Field(min_length=1)
+    timestamps: list[str] | None = Field(
+        default=None,
+        description="Local ISO timestamps with one entry per observation",
+    )
+
+
+class InferRequestBodyV15(BaseModel):
+    payload: list[SeriesPayloadV15] = Field(min_length=1)
+    model: Literal["CTSM-1.5"] = "CTSM-1.5"
+    metadata: InferMetadata = Field(default_factory=InferMetadata)
+
+
 class PredictionItem(BaseModel):
     mean: list[float | None]
     quantiles: dict[str, list[float | None]]

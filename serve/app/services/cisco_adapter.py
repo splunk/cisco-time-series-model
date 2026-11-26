@@ -5,12 +5,16 @@ from __future__ import annotations
 import inspect
 import logging
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 import torch
 from cisco_tsm import CiscoTsmMR, TimesFmCheckpoint, TimesFmHparams
 
 from app.core.config import Settings
 from app.core.constants import CDTSM_DEFAULT_QUANTILES, CDTSM_NUM_LAYERS
+
+if TYPE_CHECKING:
+    from ctsm_1p5.modeling import CTSMForecaster
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +59,14 @@ def build_cisco_tsm_model(settings: Settings) -> tuple[CiscoTsmMR, str]:
     ckpt = TimesFmCheckpoint(huggingface_repo_id=settings.hf_repo_id)
     model = CiscoTsmMR(hparams=hparams, checkpoint=ckpt)
     return model, backend
+
+
+def build_ctsm_v15_model(settings: Settings) -> tuple[CTSMForecaster, str]:
+    if settings.v15_checkpoint_path is None:
+        raise ValueError("Set CDTSM_V15_CHECKPOINT_PATH to enable CTSM 1.5")
+
+    from ctsm_1p5.modeling import load_model
+
+    backend = resolve_inference_backend(settings)
+    device = "cuda:0" if backend == "gpu" else "cpu"
+    return load_model(settings.v15_checkpoint_path, device=device), backend
