@@ -153,7 +153,7 @@ make model-up
 
 Check readiness at `GET /cdtsm/v1.5/ready`. The [CTSM 1.5 serving guide](serve/README.md#enable-ctsm-15) covers GPU setup, authentication, and example requests.
 
-CTSM 1.0 can still be self-hosted with the existing `POST /cdtsm/v1/ai/infer` endpoint. See the [CTSM 1.0 self-hosting guide](1.0/README.md#self-hosting).
+**Legacy:** CTSM 1.0 can still be self-hosted with the existing `POST /cdtsm/v1/ai/infer` endpoint. See the [CTSM 1.0 self-hosting guide](1.0/README.md#self-hosting).
 
 ## Previous Release (250M) - CTSM 1.0
 
