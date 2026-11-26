@@ -116,19 +116,17 @@ print("P50 with values only", values_only["quantiles"]["0.5"][:3].round(2))
 
 The example prints the median for the first three forecast hours. Each forecast returns 15 quantile curves, with one value per future hour. The `mean` field holds the median point forecast and equals `quantiles["0.5"]`.
 
-The [timestamp comparison notebook](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/timestamp_forecast_comparison.ipynb) shows how calendar inputs affect a weekend traffic forecast. More examples cover [CPU utilization](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/cpu_utilization_forecast.ipynb), [internet traffic](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/internet_traffic_forecast.ipynb), and [server response time alerts](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/alerting_server_responsetime.ipynb).
-
-From the repository checkout, download the notebook weights with:
-
-```shell
-hf download cisco-ai/cisco-time-series-model-1.5 model.safetensors --local-dir checkpoints
-```
+More examples are available for [CPU utilization](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/cpu_utilization_forecast.ipynb), [internet traffic](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/internet_traffic_forecast.ipynb), and [server response time alerts](https://github.com/splunk/cisco-time-series-model/blob/v1.0.3/ctsm_1p5/notebooks/alerting_server_responsetime.ipynb).
 
 ## Self-Hosting
 
 CTSM 1.5 can run as a FastAPI inference server on CPU or NVIDIA GPUs. The API accepts raw histories and optional timestamps at `POST /cdtsm/v1.5/ai/infer`.
 
-Download the weights to `checkpoints/` as shown in the [Quickstart](#quickstart), then run one of the following from the repository checkout.
+From the repository checkout, download the weights to `checkpoints/` before starting the server.
+
+```shell
+hf download cisco-ai/cisco-time-series-model-1.5 model.safetensors --local-dir checkpoints
+```
 
 **Docker**
 
