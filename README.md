@@ -101,24 +101,17 @@ model = load_model(huggingface_repo_id="cisco-ai/cisco-time-series-model-1.5")
 hours = np.arange(5 * 24, dtype=np.float32)
 history = 30 + 12 * np.sin(2 * np.pi * (hours - 7) / 24)
 
-## Example 1: With just clock
+## Example 1: With a start time and cadence
 with_clock = model.forecast(
     history, horizon_len=24, start_time="2025-01-06T00:00:00", freq="h",
 )[0]
 
 print("P50 with clock", with_clock["quantiles"]["0.5"][:3].round(2))
 
-## Example 2: Without any timestamps, just values
+## Example 2: With values only, no timestamps
 values_only = model.forecast(history, horizon_len=24)[0]
 
 print("P50 with values only", values_only["quantiles"]["0.5"][:3].round(2))
-
-## Example 3: We can also pass one timestamp per observation
-start = np.datetime64("2025-01-06T00:00")
-timestamps = start + np.arange(len(history)) * np.timedelta64(1, "h")
-with_timestamps = model.forecast(history, horizon_len=24, timestamps=timestamps)[0]
-
-print("P50 with timestamps", with_timestamps["quantiles"]["0.5"][:3].round(2))
 ```
 
 The example prints the median for the first three forecast hours. Each forecast returns 15 quantile curves, with one value per future hour. The `mean` field holds the median point forecast and equals `quantiles["0.5"]`.
@@ -130,6 +123,39 @@ From the repository checkout, download the notebook weights with:
 ```shell
 hf download cisco-ai/cisco-time-series-model-1.5 model.safetensors --local-dir checkpoints
 ```
+
+## Self-Hosting
+
+CTSM 1.5 can run as a FastAPI inference server on CPU or NVIDIA GPUs. The API accepts raw histories and optional timestamps at `POST /cdtsm/v1.5/ai/infer`.
+
+Download the weights to `checkpoints/` as shown in the [Quickstart](#quickstart), then run one of the following from the repository checkout.
+
+**Docker**
+
+```shell
+cd serve/
+cp .env-example .env  # Set CDTSM_AUTH_TOKEN in .env.
+docker compose build cdtsm
+docker compose run --rm --service-ports \
+  -v "$PWD/../checkpoints/model.safetensors:/models/model.safetensors:ro" \
+  -e CDTSM_V15_CHECKPOINT_PATH=/models/model.safetensors cdtsm
+```
+
+**Process-based hosting**
+
+Use Python 3.11.
+
+```shell
+cd serve/
+export CDTSM_AUTH_TOKEN='replace-with-your-token'
+export CDTSM_V15_CHECKPOINT_PATH="$PWD/../checkpoints/model.safetensors"
+make install-dev  # Use make install-dev-gpu for NVIDIA CUDA.
+make model-up
+```
+
+Check readiness at `GET /cdtsm/v1.5/ready`. The [CTSM 1.5 serving guide](serve/README.md#enable-ctsm-15) covers GPU setup, authentication, and example requests.
+
+CTSM 1.0 can still be self-hosted with the existing `POST /cdtsm/v1/ai/infer` endpoint. See the [CTSM 1.0 self-hosting guide](1.0/README.md#self-hosting).
 
 ## Previous Release (250M) - CTSM 1.0
 

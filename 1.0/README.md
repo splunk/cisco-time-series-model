@@ -237,7 +237,7 @@ docker compose up --build
 ```shell
 cd serve/
 cp .env-example .env   # set CDTSM_AUTH_TOKEN (user-defined token for authentication)
-export CDTSM_AUTH_TOKEN=<your-token>
+export CDTSM_AUTH_TOKEN='replace-with-your-token'
 
 # CPU-Only
 make install-dev && make model-up

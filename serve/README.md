@@ -41,13 +41,14 @@ See [Environment Variables](#environment-variables) for the full list.
 
 ### 2a. Process-based (Makefile)
 
-Use the Makefile for a quick local setup. The HTTP server starts immediately while the
+Use the Makefile for a quick local setup. Export `CDTSM_AUTH_TOKEN` in the shell
+before running `make model-up`. The HTTP server starts immediately while the
 model downloads and loads in the background.
 
 **CPU:**
 
 ```bash
-export CDTSM_AUTH_TOKEN=<your-token>   # or set in .env
+export CDTSM_AUTH_TOKEN='replace-with-your-token'
 make install-dev    # creates .venv, installs dependencies
 make model-up       # starts the server on port 8080
 ```
@@ -55,7 +56,7 @@ make model-up       # starts the server on port 8080
 **GPU (NVIDIA CUDA):**
 
 ```bash
-export CDTSM_AUTH_TOKEN=<your-token>
+export CDTSM_AUTH_TOKEN='replace-with-your-token'
 make install-dev-gpu   # creates .venv, installs CUDA PyTorch + dependencies
 make model-up          # starts the server on port 8080
 ```
@@ -113,6 +114,7 @@ read-only, and set `CDTSM_V15_CHECKPOINT_PATH` to its **container** path. The fi
 must be readable by the container's `appuser`.
 
 ```bash
+docker compose build cdtsm
 docker compose run --service-ports \
   -v /absolute/path/to/model.safetensors:/models/model.safetensors:ro \
   -e CDTSM_V15_CHECKPOINT_PATH=/models/model.safetensors cdtsm
