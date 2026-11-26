@@ -182,6 +182,8 @@ class CTSMForecaster:
         and ``'M'``, or a number of seconds).
         Scalar starts and cadences broadcast over the batch. ``start_time`` labels
         the first supplied value, before any native history trimming.
+        For explicit ``timestamps``, supply one timezone-naive timestamp per
+        observation, strictly increasing at the model's one-second resolution.
 
         ``use_timestamps=True`` requires a clock. With ``use_timestamps=False``,
         calendar features are masked even if a clock is supplied. Option overrides

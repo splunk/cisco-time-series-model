@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Any
 from collections.abc import Mapping, Sequence
 
-import torch
 import numpy as np
+import pandas as pd
+import torch
 from safetensors.torch import load_file
 
 from .preprocessing import interpolate_missing, trim_leading_missing
@@ -186,7 +187,29 @@ class CiscoTsmMR:
         tz-naive: the clock feature carries local-time semantics.
         """
 
-        t = np.asarray(ts, dtype="datetime64[s]")
+        clock = np.asarray(ts)
+        if clock.ndim != 1:
+            raise ValueError("Each timestamp sequence must be one-dimensional")
+
+        if clock.dtype.kind not in "Miuf":
+            # Parse local datetimes before converting to NumPy seconds so
+            # timezone offsets cannot be silently discarded.
+            try:
+                local_clock = pd.to_datetime(clock, format="mixed")
+            except (TypeError, ValueError, OverflowError) as error:
+                raise ValueError("timestamps must contain valid timezone-naive datetimes") from error
+            if local_clock.tz is not None:
+                raise ValueError("timestamps must be timezone-naive")
+            clock = local_clock.to_numpy()
+
+        # Keep the original seconds interpretation for numeric clocks.
+        with np.errstate(invalid="ignore"):
+            t = clock.astype("datetime64[s]")
+        if np.isnat(t).any():
+            raise ValueError("timestamps cannot contain NaT or missing values")
+        if not np.all(t[1:] > t[:-1]):
+            raise ValueError("timestamps must be strictly increasing at one-second resolution")
+
         days = t.astype("datetime64[D]")
 
         tod = (t - days).astype("timedelta64[s]").astype(np.float32)
@@ -256,16 +279,17 @@ class CiscoTsmMR:
         if timestamps is None and not allow_missing_calendar:
             raise ValueError("Supply past timestamps or enable value-only forecasting")
 
-        if (
-            timestamps is not None
-            and count == 1
-            and len(timestamps)
-            and not isinstance(timestamps[0], (list, tuple, np.ndarray))
-        ):
-            timestamps = [timestamps]
-
-        if timestamps is not None and len(timestamps) != count:
-            raise ValueError(f"Expected {count} timestamp arrays, got {len(timestamps)}")
+        if timestamps is not None:
+            # Convert the outer container positionally. A Pandas Series can
+            # have a non-default index, and a DatetimeIndex is also a row.
+            if not pd.api.types.is_list_like(timestamps):
+                raise ValueError("timestamps must be a sequence or a batch of sequences")
+            clocks = list(timestamps)
+            if count == 1 and clocks and pd.api.types.is_scalar(clocks[0]):
+                clocks = [timestamps]
+            if len(clocks) != count:
+                raise ValueError(f"Expected {count} timestamp arrays, got {len(clocks)}")
+            timestamps = clocks
 
         retain_coarse_source = horizon_len > OUTPUT_PATCH_LENGTH
 
@@ -286,7 +310,15 @@ class CiscoTsmMR:
             source_padding = np.ones_like(source_values)
 
         for row, history in enumerate(inputs):
+            raw_values = np.asarray(history)
+            if raw_values.dtype.kind == "f" and raw_values.dtype.itemsize > np.dtype(np.float32).itemsize:
+                limit = np.finfo(np.float32).max
+                outside_range = (raw_values < -limit) | (raw_values > limit)
+                if np.any(outside_range & np.isfinite(raw_values)):
+                    raise ValueError(f"Series {row} contains finite observations outside the float32 range")
+
             values = np.array(history, dtype=np.float32, copy=True).reshape(-1)
+            history_length = len(values)
             values[~np.isfinite(values)] = np.nan
 
             values = interpolate_missing(trim_leading_missing(values))
@@ -312,8 +344,8 @@ class CiscoTsmMR:
             if timestamps is not None:
                 tod, dow = self._clock_from_timestamps(timestamps[row])
 
-                if len(tod) < len(fine):
-                    raise ValueError(f"Series {row} has {len(tod)} timestamps for {len(fine)} fine steps")
+                if len(tod) != history_length:
+                    raise ValueError(f"Series {row} has {len(tod)} timestamps for {history_length} observations")
 
                 if len(fine) < 2:
                     raise ValueError(f"Series {row} needs at least two fine steps to infer the cadence")

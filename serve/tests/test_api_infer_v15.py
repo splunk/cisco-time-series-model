@@ -149,14 +149,30 @@ def test_v15_validates_history_and_timestamps(monkeypatch, tmp_path, series, sta
         v15.forecast.assert_not_called()
 
 
-def test_v15_uses_existing_bearer_auth(monkeypatch, tmp_path):
-    with configured_server(monkeypatch, tmp_path) as (client, _, v15, _):
-        wait_for_load(client, V15_READY, "succeeded")
-        response = client.post(V15_INFER, headers={"Authorization": "Bearer invalid"},
-                               json={"payload": [{"history": [1, 2]}]})
-        assert response.status_code == 401
-        assert response.json()["error"]["code"] == "authentication_failed"
-        v15.forecast.assert_not_called()
+@pytest.mark.parametrize(
+    ("route", "ready", "series"),
+    [
+        (V1_INFER, "/ready", {"coarse_ctx": [1], "fine_ctx": [1, 2]}),
+        (V15_INFER, V15_READY, {"history": [1, 2]}),
+    ],
+)
+@pytest.mark.parametrize(
+    ("auth", "status"),
+    [(b"bEaReR v15-test-token", 200), (b"Bearer invalid", 401), (b"Bearer \xe9", 401)],
+)
+def test_infer_endpoints_use_bearer_auth(monkeypatch, tmp_path, route, ready, series, auth, status):
+    with configured_server(monkeypatch, tmp_path) as (client, legacy, v15, _):
+        wait_for_load(client, ready, "succeeded")
+        response = client.post(
+            route,
+            headers={b"Authorization": auth},
+            json={"payload": [series]},
+        )
+        assert response.status_code == status, response.text
+        if status == 401:
+            assert response.json()["error"]["code"] == "authentication_failed"
+            legacy.forecast.assert_not_called()
+            v15.forecast.assert_not_called()
 
 
 def test_v15_load_failure_does_not_block_legacy_inference(monkeypatch, tmp_path):

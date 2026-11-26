@@ -4,12 +4,9 @@ from __future__ import annotations
 
 import logging
 
-import httpx
 import huggingface_hub.constants as hf_constants
-from huggingface_hub.utils._http import (
-    hf_request_event_hook,
-    set_client_factory,
-)
+from huggingface_hub.utils import get_session, set_client_factory
+from huggingface_hub.utils._http import hf_request_event_hook
 
 try:
     import truststore as _truststore
@@ -42,12 +39,13 @@ def configure_huggingface_http(settings: Settings) -> None:
     else:
         verify = True
 
-    def factory() -> httpx.Client:
-        return httpx.Client(
+    # Hub versions use different HTTP client implementations.
+    client_type = type(get_session())
+    set_client_factory(
+        lambda: client_type(
             verify=verify,
             event_hooks={"request": [hf_request_event_hook]},
             follow_redirects=True,
             timeout=None,
         )
-
-    set_client_factory(factory)
+    )

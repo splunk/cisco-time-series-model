@@ -21,9 +21,9 @@ auth_scheme = HTTPBearer(
 
 def verify_auth_token(settings: Settings, request: Request) -> None:
     auth = request.headers.get("authorization") or ""
-    prefix = "Bearer "
-    if not auth.startswith(prefix):
+    scheme, separator, token = auth.partition(" ")
+    if not separator or scheme.lower() != "bearer":
         raise AIPlatformAuthenticationError("Missing or invalid Authorization header")
-    token = auth[len(prefix):].strip()
-    if not token or not hmac.compare_digest(token, settings.auth_token):
+    token = token.strip()
+    if not token or not hmac.compare_digest(token.encode(), settings.auth_token.encode()):
         raise AIPlatformAuthenticationError("Invalid auth token")
