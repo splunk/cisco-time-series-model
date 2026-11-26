@@ -182,6 +182,8 @@ class MultiResolutionDecoder(nn.Module):
         )
 
 
+    # Adapted from TimesFM 2.5 (Copyright 2025 Google LLC).
+    # https://github.com/google-research/timesfm/blob/918df02c9d366b2145bc5876135fa2131d3ed2a6/src/timesfm/torch/util.py#L33
     @staticmethod
     def update_running_stats(
         n: torch.Tensor,
