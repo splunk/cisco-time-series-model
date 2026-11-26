@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 
 description = "Cisco Time Series Model is a pretrained Multi-resolution time series forecasting model."
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 
 dynamic = ["dependencies"]
 authors = [

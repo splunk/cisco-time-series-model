@@ -1,0 +1,23 @@
+Cisco Time Series Model
+
+CTSM 1.5 adapts parts of MultiResolutionDecoder and the RMSNorm, ResidualBlock,
+and TransformerMLP layers from TimesFM. It reuses the padding sentinel (PAD_VALUE)
+and adapts the TimesFM 2.5 running normalization helper. Its flip equivariance
+follows TimesFM 2.5's flip-invariance and TimesFM 3.0's symmetric averaging.
+
+Copyright 2024, 2025, and 2026 Google LLC.
+The referenced source code is licensed under the Apache License, Version 2.0.
+
+https://github.com/google-research/timesfm/blob/918df02c9d366b2145bc5876135fa2131d3ed2a6/v1/src/timesfm/pytorch_patched_decoder.py
+https://github.com/google-research/timesfm/blob/918df02c9d366b2145bc5876135fa2131d3ed2a6/src/timesfm/torch/util.py#L33
+https://github.com/google-research/timesfm/blob/918df02c9d366b2145bc5876135fa2131d3ed2a6/src/timesfm/timesfm_2p5/timesfm_2p5_torch.py#L473
+https://github.com/google-research/timesfm/blob/918df02c9d366b2145bc5876135fa2131d3ed2a6/src/timesfm3/torch/timesfm3_forecaster.py#L784
+
+CTSM 1.5 adapts Chronos-2's trapezoidal quantile weighting and weighted quantile
+pooling for multi-path forecasts.
+
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Licensed under the Apache License, Version 2.0.
+
+https://github.com/amazon-science/chronos-forecasting/blob/1224fafa91e1ecd6674f5204066b159e40b5e4a1/src/chronos/chronos2/pipeline.py#L51
+https://github.com/amazon-science/chronos-forecasting/blob/1224fafa91e1ecd6674f5204066b159e40b5e4a1/src/chronos/utils.py#L135
